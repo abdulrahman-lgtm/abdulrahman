@@ -1,0 +1,125 @@
+@import "tailwindcss";
+
+@theme {
+  --font-sans: 'Cairo', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  --font-mono: 'JetBrains Mono', monospace;
+}
+
+:root {
+  font-family: 'Cairo', system-ui, -apple-system, sans-serif;
+}
+
+/* Glassmorphism Styles */
+.glass-panel {
+  background: rgba(15, 23, 42, 0.75);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.glass-panel-cyan {
+  background: rgba(13, 22, 44, 0.85);
+  backdrop-filter: blur(18px);
+  -webkit-backdrop-filter: blur(18px);
+  border: 1px solid rgba(0, 242, 254, 0.35);
+  box-shadow: 0 0 25px rgba(0, 242, 254, 0.08), inset 0 0 15px rgba(0, 242, 254, 0.03);
+}
+
+.shadow-neon-cyan {
+  box-shadow: 0 0 20px rgba(0, 242, 254, 0.35);
+}
+
+.shadow-neon-emerald {
+  box-shadow: 0 0 20px rgba(16, 185, 129, 0.35);
+}
+
+.shadow-neon-rose {
+  box-shadow: 0 0 20px rgba(244, 63, 94, 0.35);
+}
+
+/* Radar & Scanner Animations */
+@keyframes scanSweep {
+  0% { transform: translateY(-100%); opacity: 0.3; }
+  50% { opacity: 1; }
+  100% { transform: translateY(100%); opacity: 0.3; }
+}
+
+.scan-line {
+  animation: scanSweep 2.2s cubic-bezier(0.4, 0, 0.2, 1) infinite alternate;
+}
+
+@keyframes radarSpin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+.radar-sweep {
+  transform-origin: center center;
+  animation: radarSpin 4s linear infinite;
+}
+
+/* Custom Scrollbars */
+.custom-scroll::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+.custom-scroll::-webkit-scrollbar-track {
+  background: rgba(15, 23, 42, 0.6);
+  border-radius: 9999px;
+}
+.custom-scroll::-webkit-scrollbar-thumb {
+  background: rgba(56, 189, 248, 0.25);
+  border-radius: 9999px;
+}
+.custom-scroll::-webkit-scrollbar-thumb:hover {
+  background: rgba(0, 242, 254, 0.5);
+}
+
+/* Print Styles */
+@media print {
+  .no-print {
+    display: none !important;
+  }
+  .print-only {
+    display: block !important;
+  }
+  body {
+    background: #ffffff !important;
+    color: #0f172a !important;
+  }
+  .glass-panel, .glass-panel-cyan {
+    background: #ffffff !important;
+    border: 1px solid #cbd5e1 !important;
+    color: #0f172a !important;
+    box-shadow: none !important;
+    backdrop-filter: none !important;
+  }
+}
+@media screen {
+  .print-only {
+    display: none !important;
+  }
+}
+
+/* Leaflet Custom Styling & Dark Filter */
+.dark-leaflet-map .leaflet-tile-pane {
+  filter: invert(100%) hue-rotate(180deg) brightness(92%) contrast(92%);
+}
+
+.leaflet-container {
+  background: #070b14 !important;
+  font-family: 'Cairo', sans-serif !important;
+}
+
+.leaflet-popup-content-wrapper {
+  background: #0f172a !important;
+  color: #f8fafc !important;
+  border: 1px solid rgba(0, 242, 254, 0.4) !important;
+  border-radius: 12px !important;
+  box-shadow: 0 0 20px rgba(0, 242, 254, 0.2) !important;
+}
+
+.leaflet-popup-tip {
+  background: #0f172a !important;
+}
+

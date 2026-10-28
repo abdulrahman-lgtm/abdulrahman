@@ -1,0 +1,6 @@
+{
+  "name": "نظام بصمة الوجه والـ GPS الذكي",
+  "description": "نظام متكامل ومتقدم لتسجيل حضور وانصراف الموظفين عبر التعرف على الوجه الحي وفحص الحيوية والتحديد الجغرافي الذكي.",
+  "requestFramePermissions": ["camera", "geolocation"],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

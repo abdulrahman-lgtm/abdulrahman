@@ -1,0 +1,1320 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>نظام بصمة الوجه الحية الجغرافي - Live Face & GPS Attendance System</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Font Awesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Google Fonts (Cairo) -->
+    <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@300;400;600;700;800;900&display=swap" rel="stylesheet">
+    
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    fontFamily: {
+                        cairo: ['Cairo', 'sans-serif'],
+                    },
+                    colors: {
+                        cyber: {
+                            bg: '#0a0f1d',
+                            card: 'rgba(15, 23, 42, 0.75)',
+                            border: 'rgba(56, 189, 248, 0.2)',
+                            primary: '#00f0ff',
+                            secondary: '#7000ff',
+                            success: '#10b981',
+                            danger: '#f43f5e',
+                            warning: '#f59e0b'
+                        }
+                    },
+                    boxShadow: {
+                        'neon-cyan': '0 0 20px rgba(0, 240, 255, 0.35)',
+                        'neon-purple': '0 0 20px rgba(112, 0, 255, 0.35)',
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        body {
+            font-family: 'Cairo', sans-serif;
+            background-color: #070b14;
+            color: #f1f5f9;
+            background-image: 
+                radial-gradient(circle at 15% 15%, rgba(0, 240, 255, 0.05) 0%, transparent 40%),
+                radial-gradient(circle at 85% 85%, rgba(112, 0, 255, 0.05) 0%, transparent 40%);
+            min-h: 100vh;
+        }
+
+        /* Glassmorphism Effect */
+        .glass-panel {
+            background: rgba(15, 23, 42, 0.7);
+            backdrop-filter: blur(16px);
+            -webkit-backdrop-filter: blur(16px);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+        }
+
+        .glass-panel-cyan {
+            background: rgba(15, 23, 42, 0.8);
+            backdrop-filter: blur(16px);
+            border: 1px solid rgba(0, 240, 255, 0.3);
+            box-shadow: 0 8px 32px 0 rgba(0, 240, 255, 0.1);
+        }
+
+        /* Radar scan animation */
+        @keyframes scanSweep {
+            0% { transform: translateY(-100%); }
+            100% { transform: translateY(100%); }
+        }
+        .scan-line {
+            animation: scanSweep 2.5s ease-in-out infinite alternate;
+        }
+
+        @keyframes pulseGlow {
+            0%, 100% { opacity: 0.3; transform: scale(1); }
+            50% { opacity: 0.8; transform: scale(1.05); }
+        }
+        .pulse-glow {
+            animation: pulseGlow 2s infinite;
+        }
+
+        /* Print styles */
+        @media print {
+            .no-print { display: none !important; }
+            .print-only { display: block !important; }
+            body { background: white !important; color: black !important; }
+            .glass-panel { background: white !important; border: 1px solid #ccc !important; text-color: black !important; }
+        }
+    </style>
+</head>
+<body class="min-h-screen flex flex-col justify-between selection:bg-cyan-500 selection:text-black">
+
+    <!-- Top Navigation Header -->
+    <header class="glass-panel sticky top-0 z-40 border-b border-slate-800/80 no-print">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-20 flex items-center justify-between">
+            
+            <!-- Brand Logo -->
+            <div class="flex items-center space-x-3 space-x-reverse">
+                <div class="relative w-12 h-12 rounded-2xl bg-gradient-to-tr from-cyan-500 to-purple-600 p-0.5 shadow-neon-cyan">
+                    <div class="w-full h-full bg-slate-950 rounded-[14px] flex items-center justify-center">
+                        <i class="fa-solid fa-face-viewfinder text-cyan-400 text-2xl animate-pulse"></i>
+                    </div>
+                </div>
+                <div>
+                    <h1 class="font-black text-xl tracking-wide bg-clip-text text-transparent bg-gradient-to-r from-cyan-400 via-sky-200 to-purple-400">
+                        BIO-GPS VISION
+                    </h1>
+                    <p class="text-[11px] text-cyan-400/70 font-semibold tracking-wider">نظام البصمة الوجهية الجغرافية الحية</p>
+                </div>
+            </div>
+
+            <!-- Role Switcher & Live GPS Indicator -->
+            <div class="flex items-center space-x-3 space-x-reverse">
+                <div class="hidden md:flex items-center space-x-2 space-x-reverse px-3 py-1.5 rounded-full bg-slate-900/80 border border-slate-800 text-xs text-slate-300">
+                    <span class="w-2.5 h-2.5 rounded-full bg-cyan-400 animate-ping"></span>
+                    <span id="gps-header-status" class="font-mono text-[11px] text-cyan-300">GPS: جاري الالتقاط...</span>
+                </div>
+
+                <!-- Role Switcher Buttons -->
+                <div class="bg-slate-900/90 p-1.5 rounded-2xl border border-slate-800 flex text-xs font-bold">
+                    <button id="btn-role-emp" onclick="switchRole('employee')" class="px-4 py-2 rounded-xl transition-all duration-300 bg-cyan-500 text-slate-950 shadow-neon-cyan">
+                        <i class="fa-solid fa-user-astronaut ml-1.5"></i> الموظف
+                    </button>
+                    <button id="btn-role-admin" onclick="switchRole('admin')" class="px-4 py-2 rounded-xl transition-all duration-300 text-slate-400 hover:text-white">
+                        <i class="fa-solid fa-shield-halved ml-1.5"></i> مدير النظام
+                    </button>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <!-- MAIN CONTENT VIEW CONTAINER -->
+    <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 flex-1 w-full">
+
+        <!-- ========================================== -->
+        <!-- VIEW 1: EMPLOYEE PORTAL (FACE SCAN & GPS) -->
+        <!-- ========================================== -->
+        <section id="view-employee" class="space-y-8">
+            
+            <!-- Employee Profile Selector & Bar -->
+            <div class="glass-panel p-5 rounded-3xl flex flex-wrap items-center justify-between gap-4 border-l-4 border-l-cyan-400">
+                <div class="flex items-center space-x-4 space-x-reverse">
+                    <div class="relative">
+                        <img id="emp-avatar-img" src="https://placehold.co/100x100/1e293b/00f0ff?text=User" class="w-14 h-14 rounded-2xl object-cover border-2 border-cyan-400/50 shadow-neon-cyan">
+                        <span class="absolute -bottom-1 -left-1 w-4 h-4 bg-emerald-500 border-2 border-slate-900 rounded-full"></span>
+                    </div>
+                    <div>
+                        <div class="flex items-center space-x-2 space-x-reverse">
+                            <span class="text-xs font-bold px-2.5 py-0.5 rounded-md bg-cyan-950 text-cyan-300 border border-cyan-800/50" id="emp-dept-badge">قسم تكنولوجيا المعلومات</span>
+                            <span class="text-xs font-mono text-slate-400" id="emp-code">#EMP-101</span>
+                        </div>
+                        <h2 class="text-xl font-black text-white mt-1" id="emp-name-display">مصطفى علي أحمد</h2>
+                    </div>
+                </div>
+
+                <!-- Simulation switch selector -->
+                <div class="flex items-center space-x-3 space-x-reverse bg-slate-900/80 p-2 rounded-2xl border border-slate-800">
+                    <i class="fa-solid fa-user-gear text-cyan-400 text-sm"></i>
+                    <label class="text-xs text-slate-300 font-semibold hidden sm:inline">تبديل الموظف للمعاينة:</label>
+                    <select id="select-emp-mock" onchange="changeEmployeeUser(this.value)" class="text-xs bg-slate-950 border border-slate-700 text-cyan-300 rounded-xl p-2 focus:ring-2 focus:ring-cyan-400 outline-none">
+                        <!-- Filled dynamically -->
+                    </select>
+                </div>
+            </div>
+
+            <!-- Main Scanner & Dashboard Grid -->
+            <div class="grid grid-cols-1 lg:grid-cols-12 gap-8">
+                
+                <!-- LEFT/MAIN COLUMN: WEBCAM FACE SCANNER & LIVENESS TEST (7 Cols) -->
+                <div class="lg:col-span-7 glass-panel-cyan p-6 rounded-3xl flex flex-col items-center justify-between relative overflow-hidden">
+                    
+                    <div class="w-full flex items-center justify-between mb-4">
+                        <div class="flex items-center space-x-2 space-x-reverse">
+                            <i class="fa-solid fa-camera-rotate text-cyan-400 animate-spin text-lg" style="animation-duration: 6s;"></i>
+                            <h3 class="font-bold text-slate-200 text-base">ماسح الوجه الحي مع كشف الحيوية</h3>
+                        </div>
+                        <span id="liveness-badge" class="px-3 py-1 rounded-full text-xs font-bold bg-slate-900 text-amber-400 border border-amber-500/30 flex items-center">
+                            <i class="fa-solid fa-triangle-exclamation ml-1.5"></i> بانتظار بدء الفحص
+                        </span>
+                    </div>
+
+                    <!-- WEBCAM DISPLAY CONTAINER -->
+                    <div class="relative w-full aspect-[4/3] max-w-md bg-slate-950 rounded-2xl overflow-hidden border-2 border-cyan-500/40 shadow-2xl flex items-center justify-center my-2 group">
+                        
+                        <!-- Real Video Stream -->
+                        <video id="webcam-video" autoplay playsinline muted class="w-full h-full object-cover transform -scale-x-100"></video>
+                        
+                        <!-- Canvas Overlay for Mesh & Polygon Drawing -->
+                        <canvas id="face-canvas" class="absolute inset-0 w-full h-full pointer-events-none transform -scale-x-100"></canvas>
+
+                        <!-- HUD Scan Lines overlay -->
+                        <div id="scan-overlay" class="absolute inset-0 pointer-events-none hidden">
+                            <div class="w-full h-1 bg-gradient-to-r from-transparent via-cyan-400 to-transparent scan-line shadow-neon-cyan"></div>
+                            <!-- Corner Targets -->
+                            <div class="absolute top-4 right-4 w-8 h-8 border-t-2 border-r-2 border-cyan-400"></div>
+                            <div class="absolute top-4 left-4 w-8 h-8 border-t-2 border-l-2 border-cyan-400"></div>
+                            <div class="absolute bottom-4 right-4 w-8 h-8 border-b-2 border-r-2 border-cyan-400"></div>
+                            <div class="absolute bottom-4 left-4 w-8 h-8 border-b-2 border-l-2 border-cyan-400"></div>
+                        </div>
+
+                        <!-- Camera Offline Placeholder -->
+                        <div id="camera-placeholder" class="absolute inset-0 flex flex-col items-center justify-center bg-slate-950/90 text-center p-6 space-y-4">
+                            <div class="w-20 h-20 rounded-full bg-cyan-950/50 border border-cyan-500/30 flex items-center justify-center text-cyan-400 text-3xl pulse-glow">
+                                <i class="fa-solid fa-head-side-goggles"></i>
+                            </div>
+                            <div>
+                                <h4 class="font-bold text-slate-200 text-sm">الكاميرا متوقفة حالياً</h4>
+                                <p class="text-xs text-slate-400 mt-1 max-w-xs">اضغط على زر تشغيل الكاميرا لبدء فحص بصمة الوجه واختبار الحيوية</p>
+                            </div>
+                            <button onclick="startCamera()" class="px-6 py-2.5 rounded-xl bg-gradient-to-r from-cyan-500 to-blue-600 text-slate-950 font-bold text-xs shadow-neon-cyan hover:brightness-110 transition">
+                                <i class="fa-solid fa-power-off ml-1.5"></i> تشغيل الكاميرا والحساس
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- LIVENESS INSTRUCTION BANNER -->
+                    <div id="liveness-instruction-box" class="w-full max-w-md my-4 p-3.5 rounded-2xl bg-slate-900/90 border border-slate-800 text-center">
+                        <span class="text-xs text-slate-400 block mb-1">تعليمات الاختبار الحي الحالية:</span>
+                        <div id="liveness-instruction-text" class="text-base font-extrabold text-cyan-300 flex items-center justify-center space-x-2 space-x-reverse">
+                            <i class="fa-solid fa-info-circle"></i>
+                            <span>قم بتشغيل الكاميرا لبدء التوجيهات الحية</span>
+                        </div>
+                    </div>
+
+                    <!-- PUNCH ACTIONS BUTTONS -->
+                    <div class="w-full max-w-md grid grid-cols-2 gap-4">
+                        <button id="btn-punch-in" onclick="triggerBiometricPunch('IN')" disabled class="py-4 px-4 bg-slate-800 text-slate-500 font-extrabold rounded-2xl shadow-lg transition duration-300 flex items-center justify-center space-x-2 space-x-reverse cursor-not-allowed">
+                            <i class="fa-solid fa-right-to-bracket text-lg"></i>
+                            <span>بصمة دخول (حضور)</span>
+                        </button>
+                        <button id="btn-punch-out" onclick="triggerBiometricPunch('OUT')" disabled class="py-4 px-4 bg-slate-800 text-slate-500 font-extrabold rounded-2xl shadow-lg transition duration-300 flex items-center justify-center space-x-2 space-x-reverse cursor-not-allowed">
+                            <i class="fa-solid fa-right-from-bracket text-lg"></i>
+                            <span>بصمة خروج (انصراف)</span>
+                        </button>
+                    </div>
+
+                </div>
+
+                <!-- RIGHT COLUMN: GPS RADAR & LIVE CLOCK & LOGS (5 Cols) -->
+                <div class="lg:col-span-5 space-y-6 flex flex-col">
+                    
+                    <!-- Digital Live Clock & Geofence Radar Box -->
+                    <div class="glass-panel p-6 rounded-3xl flex flex-col justify-between items-center text-center space-y-5">
+                        <div class="w-full flex justify-between items-center border-b border-slate-800 pb-3">
+                            <div class="text-right">
+                                <div class="text-[11px] font-bold text-cyan-400/80 tracking-widest uppercase">التاريخ والوقت الحية</div>
+                                <div class="text-xs text-slate-400" id="live-date">الأحد، 27 أكتوبر 2026</div>
+                            </div>
+                            <div class="text-3xl font-black font-mono text-cyan-300 tracking-wider shadow-sm" id="live-time">
+                                00:00:00
+                            </div>
+                        </div>
+
+                        <!-- GPS Geofence Radar Widget -->
+                        <div class="w-full bg-slate-950/80 p-4 rounded-2xl border border-slate-800 text-right space-y-3 relative overflow-hidden">
+                            <div class="flex items-center justify-between">
+                                <span class="text-xs font-bold text-slate-300 flex items-center">
+                                    <i class="fa-solid fa-location-dot text-rose-500 ml-1.5 animate-bounce"></i>
+                                    مقر العمل المحدد:
+                                </span>
+                                <span class="text-xs font-bold text-cyan-400" id="emp-workplace-name">المقر الرئيسي</span>
+                            </div>
+
+                            <div class="flex items-center justify-between text-xs">
+                                <span class="text-slate-400">النطاق الجغرافي المسموح:</span>
+                                <span class="font-mono font-bold text-slate-200" id="emp-allowed-radius">100 متر</span>
+                            </div>
+
+                            <div class="flex items-center justify-between text-xs">
+                                <span class="text-slate-400">بعدك الحالي عن المقر:</span>
+                                <span class="font-mono font-extrabold text-emerald-400 text-sm" id="emp-current-distance">جاري الحساب...</span>
+                            </div>
+
+                            <!-- Radar Bar Progress -->
+                            <div class="w-full bg-slate-900 h-2 rounded-full overflow-hidden border border-slate-800">
+                                <div id="radar-progress-bar" class="bg-gradient-to-r from-emerald-500 to-cyan-400 h-full w-0 transition-all duration-500"></div>
+                            </div>
+
+                            <div class="flex items-center justify-between text-[11px] pt-1">
+                                <span id="geofence-status-pill" class="px-2 py-0.5 rounded bg-emerald-950 text-emerald-300 border border-emerald-800">
+                                    داخل النطاق المسموح
+                                </span>
+                                <button onclick="fetchGPSLocation()" class="text-cyan-400 hover:underline flex items-center">
+                                    <i class="fa-solid fa-rotate-right ml-1"></i> إعادة التقاط الموقع
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Personal Attendance Logs -->
+                    <div class="glass-panel p-6 rounded-3xl flex-1 flex flex-col justify-between">
+                        <div class="flex items-center justify-between mb-4">
+                            <h3 class="font-bold text-white text-base flex items-center">
+                                <i class="fa-solid fa-list-check text-cyan-400 ml-2"></i>
+                                سجل بصماتي اليومية
+                            </h3>
+                            <span class="text-[11px] text-slate-400">آخر النشاطات المرصودة</span>
+                        </div>
+
+                        <div class="overflow-y-auto max-h-56 custom-scroll">
+                            <table class="w-full text-right text-xs">
+                                <thead class="bg-slate-900/80 text-slate-400 border-b border-slate-800">
+                                    <tr>
+                                        <th class="p-2.5 font-semibold">التاريخ</th>
+                                        <th class="p-2.5 font-semibold">الدخول</th>
+                                        <th class="p-2.5 font-semibold">الخروج</th>
+                                        <th class="p-2.5 font-semibold">الحيوية</th>
+                                        <th class="p-2.5 font-semibold">الحالة</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="emp-logs-tbody" class="divide-y divide-slate-800/50">
+                                    <!-- Dynamic Rows -->
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+
+                </div>
+
+            </div>
+
+        </section>
+
+        <!-- ========================================== -->
+        <!-- VIEW 2: ADMIN CONTROL DASHBOARD -->
+        <!-- ========================================== -->
+        <section id="view-admin" class="space-y-8 hidden">
+            
+            <!-- Admin Tabs Navigation -->
+            <div class="glass-panel p-2 rounded-2xl flex flex-wrap gap-2 border-slate-800">
+                <button onclick="switchAdminTab('overview')" id="tab-btn-overview" class="px-5 py-2.5 rounded-xl font-bold text-xs bg-cyan-500 text-slate-950 transition shadow-neon-cyan">
+                    <i class="fa-solid fa-chart-line ml-1.5"></i> النظرة العامة الإحصائية
+                </button>
+                <button onclick="switchAdminTab('employees')" id="tab-btn-employees" class="px-5 py-2.5 rounded-xl font-bold text-xs text-slate-300 hover:bg-slate-800/60 transition">
+                    <i class="fa-solid fa-id-card-clip ml-1.5"></i> إدارة الموظفين والبصمات
+                </button>
+                <button onclick="switchAdminTab('reports')" id="tab-btn-reports" class="px-5 py-2.5 rounded-xl font-bold text-xs text-slate-300 hover:bg-slate-800/60 transition">
+                    <i class="fa-solid fa-file-contract ml-1.5"></i> تقارير الحضور والغياب والطباعة
+                </button>
+            </div>
+
+            <!-- TAB 1: OVERVIEW & STATS -->
+            <div id="admin-tab-overview" class="space-y-6">
+                <!-- Summary KPI Cards -->
+                <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+                    <div class="glass-panel p-5 rounded-3xl border-slate-800/80">
+                        <div class="flex items-center justify-between text-slate-400 mb-2">
+                            <span class="text-xs font-bold">إجمالي كادر الموظفين</span>
+                            <i class="fa-solid fa-users-viewfinder text-cyan-400 text-xl"></i>
+                        </div>
+                        <div class="text-3xl font-black text-white" id="stat-total-emp">0</div>
+                        <span class="text-[10px] text-cyan-400/80 font-mono">مسجلين في قاعدة الوجه</span>
+                    </div>
+
+                    <div class="glass-panel p-5 rounded-3xl border-slate-800/80">
+                        <div class="flex items-center justify-between text-emerald-400 mb-2">
+                            <span class="text-xs font-bold">حاضرون اليوم في الوقت</span>
+                            <i class="fa-solid fa-user-check text-xl"></i>
+                        </div>
+                        <div class="text-3xl font-black text-emerald-400" id="stat-present-emp">0</div>
+                        <span class="text-[10px] text-emerald-400/80">بصمة موثوقة + GPS</span>
+                    </div>
+
+                    <div class="glass-panel p-5 rounded-3xl border-slate-800/80">
+                        <div class="flex items-center justify-between text-amber-400 mb-2">
+                            <span class="text-xs font-bold">المتأخرون اليوم</span>
+                            <i class="fa-solid fa-clock-rotate-left text-xl"></i>
+                        </div>
+                        <div class="text-3xl font-black text-amber-400" id="stat-late-emp">0</div>
+                        <span class="text-[10px] text-amber-400/80">بعد الوقت المحدد</span>
+                    </div>
+
+                    <div class="glass-panel p-5 rounded-3xl border-slate-800/80">
+                        <div class="flex items-center justify-between text-rose-400 mb-2">
+                            <span class="text-xs font-bold">المتغيبون اليوم</span>
+                            <i class="fa-solid fa-user-xmark text-xl"></i>
+                        </div>
+                        <div class="text-3xl font-black text-rose-400" id="stat-absent-emp">0</div>
+                        <span class="text-[10px] text-rose-400/80">لم تسجل لهم بصمة</span>
+                    </div>
+                </div>
+
+                <!-- Live Realtime Logs Table -->
+                <div class="glass-panel p-6 rounded-3xl">
+                    <h3 class="font-bold text-white text-base mb-4 flex items-center">
+                        <i class="fa-solid fa-wave-square text-cyan-400 ml-2 animate-pulse"></i>
+                        حركات البصمة الحية المرصودة اليوم
+                    </h3>
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-right text-xs">
+                            <thead class="bg-slate-900/90 text-slate-400 border-b border-slate-800">
+                                <tr>
+                                    <th class="p-3 font-semibold">الموظف</th>
+                                    <th class="p-3 font-semibold">التشكيل/القسم</th>
+                                    <th class="p-3 font-semibold">نوع الحركة</th>
+                                    <th class="p-3 font-semibold">الوقت</th>
+                                    <th class="p-3 font-semibold">اختبار الحيوية</th>
+                                    <th class="p-3 font-semibold">مسافة GPS</th>
+                                    <th class="p-3 font-semibold">الحالة</th>
+                                </tr>
+                            </thead>
+                            <tbody id="admin-live-logs" class="divide-y divide-slate-800/50">
+                                <!-- Dynamic rows -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <!-- TAB 2: EMPLOYEES MANAGEMENT -->
+            <div id="admin-tab-employees" class="space-y-6 hidden">
+                <div class="flex flex-wrap items-center justify-between gap-4">
+                    <div>
+                        <h3 class="font-bold text-white text-lg">إدارة بيانات الموظفين والبصمة المرجعية</h3>
+                        <p class="text-xs text-slate-400">تحديد الموقع الجغرافي والتقاط بصمة الوجه المرجعية</p>
+                    </div>
+                    <button onclick="openEmployeeModal()" class="px-5 py-2.5 bg-gradient-to-r from-cyan-500 to-blue-600 text-slate-950 font-bold rounded-xl text-xs shadow-neon-cyan hover:brightness-110 transition flex items-center">
+                        <i class="fa-solid fa-user-plus ml-2"></i> إضافة موظف وبصمة جديدة
+                    </button>
+                </div>
+
+                <!-- Employee List Table -->
+                <div class="glass-panel rounded-3xl overflow-hidden border-slate-800">
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-right text-xs">
+                            <thead class="bg-slate-900/90 text-slate-400 border-b border-slate-800">
+                                <tr>
+                                    <th class="p-4 font-semibold">صورة الوجه المرجعية</th>
+                                    <th class="p-4 font-semibold">الموظف</th>
+                                    <th class="p-4 font-semibold">الرقم الوظيفي</th>
+                                    <th class="p-4 font-semibold">التشكيل / القسم</th>
+                                    <th class="p-4 font-semibold">إحداثيات المقر (GPS)</th>
+                                    <th class="p-4 font-semibold">نطاق السماح</th>
+                                    <th class="p-4 font-semibold text-center">الإجراءات</th>
+                                </tr>
+                            </thead>
+                            <tbody id="admin-emp-table" class="divide-y divide-slate-800/50">
+                                <!-- Dynamic Rows -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <!-- TAB 3: REPORTS & PRINTING -->
+            <div id="admin-tab-reports" class="space-y-6 hidden">
+                <!-- Filters Header -->
+                <div class="glass-panel p-6 rounded-3xl no-print space-y-4">
+                    <h3 class="font-bold text-white text-base border-b border-slate-800 pb-2">خيارات تصفية واستخراج التقارير</h3>
+                    <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
+                        <div>
+                            <label class="block text-xs font-semibold text-slate-300 mb-1.5">التشكيل / القسم</label>
+                            <select id="report-filter-dept" onchange="generateReport()" class="w-full bg-slate-950 border border-slate-700 text-cyan-300 text-xs rounded-xl p-2.5 focus:ring-2 focus:ring-cyan-400 outline-none">
+                                <option value="ALL">جميع التشكيلات والأقسام</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="block text-xs font-semibold text-slate-300 mb-1.5">حالة الحضور والغياب</label>
+                            <select id="report-filter-status" onchange="generateReport()" class="w-full bg-slate-950 border border-slate-700 text-cyan-300 text-xs rounded-xl p-2.5 focus:ring-2 focus:ring-cyan-400 outline-none">
+                                <option value="ALL">الجميع (حاضر / متأخر / غائب)</option>
+                                <option value="PRESENT">حاضر في الوقت</option>
+                                <option value="LATE">المتأخرين فقط</option>
+                                <option value="ABSENT">المتغيبين فقط</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="block text-xs font-semibold text-slate-300 mb-1.5">التاريخ المطلوب</label>
+                            <input type="date" id="report-filter-date" onchange="generateReport()" class="w-full bg-slate-950 border border-slate-700 text-cyan-300 text-xs rounded-xl p-2 focus:ring-2 focus:ring-cyan-400 outline-none">
+                        </div>
+                        <div class="flex items-end space-x-2 space-x-reverse">
+                            <button onclick="window.print()" class="flex-1 py-2.5 bg-slate-800 hover:bg-slate-700 text-white rounded-xl text-xs font-bold transition flex items-center justify-center">
+                                <i class="fa-solid fa-print ml-1.5 text-cyan-400"></i> طباعة التقرير
+                            </button>
+                            <button onclick="exportCSV()" class="flex-1 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-slate-950 rounded-xl text-xs font-extrabold transition flex items-center justify-center">
+                                <i class="fa-solid fa-file-csv ml-1.5"></i> تصدير CSV
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Printable Report Header -->
+                <div class="hidden print-only mb-6 text-center border-b pb-4">
+                    <h1 class="text-2xl font-black">تقرير الحضور والغياب ببصمة الوجه الجغرافية</h1>
+                    <p class="text-sm text-slate-600 mt-1" id="print-report-date-title">التاريخ: --</p>
+                </div>
+
+                <!-- Report Content Table -->
+                <div class="glass-panel rounded-3xl overflow-hidden border-slate-800">
+                    <div class="p-4 border-b border-slate-800/80 flex justify-between items-center no-print">
+                        <span class="text-xs font-bold text-slate-400" id="report-count-summary">عدد السجلات: 0</span>
+                    </div>
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-right text-xs">
+                            <thead class="bg-slate-900/90 text-slate-400 border-b border-slate-800">
+                                <tr>
+                                    <th class="p-3.5 font-semibold">الموظف</th>
+                                    <th class="p-3.5 font-semibold">الرقم الوظيفي</th>
+                                    <th class="p-3.5 font-semibold">التشكيل / القسم</th>
+                                    <th class="p-3.5 font-semibold">وقت الدخول</th>
+                                    <th class="p-3.5 font-semibold">وقت الخروج</th>
+                                    <th class="p-3.5 font-semibold">اختبار الحيوية (Liveness)</th>
+                                    <th class="p-3.5 font-semibold">الحالة</th>
+                                </tr>
+                            </thead>
+                            <tbody id="report-tbody" class="divide-y divide-slate-800/50">
+                                <!-- Dynamic Report Content -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+        </section>
+
+    </main>
+
+    <!-- ========================================== -->
+    <!-- MODAL: ADD / EDIT EMPLOYEE WITH FACE SNAP -->
+    <!-- ========================================== -->
+    <div id="modal-employee" class="fixed inset-0 bg-slate-950/80 backdrop-blur-md z-50 flex items-center justify-center hidden p-4 no-print">
+        <div class="glass-panel-cyan rounded-3xl shadow-2xl w-full max-w-xl overflow-hidden border border-cyan-500/30">
+            <div class="px-6 py-4 bg-slate-900/90 border-b border-slate-800 flex justify-between items-center">
+                <h3 class="font-bold text-white text-base" id="modal-emp-title">تسجيل موظف وبصمة وجه جديدة</h3>
+                <button onclick="closeEmployeeModal()" class="text-slate-400 hover:text-white">
+                    <i class="fa-solid fa-xmark text-lg"></i>
+                </button>
+            </div>
+            
+            <form id="form-employee" onsubmit="saveEmployee(event)" class="p-6 space-y-4 max-h-[85vh] overflow-y-auto custom-scroll">
+                <input type="hidden" id="emp-form-id">
+                <input type="hidden" id="emp-form-face-data">
+
+                <!-- Face Snap Preview Box -->
+                <div class="flex flex-col items-center justify-center space-y-2 border border-slate-800 p-3 rounded-2xl bg-slate-950/60">
+                    <label class="text-xs font-bold text-cyan-400">صورة البصمة المرجعية للوجه</label>
+                    <div class="relative w-28 h-28 rounded-2xl overflow-hidden border-2 border-cyan-400/50 bg-slate-900 flex items-center justify-center">
+                        <img id="emp-form-snap-preview" src="https://placehold.co/150x150/1e293b/00f0ff?text=Snap" class="w-full h-full object-cover">
+                    </div>
+                    <button type="button" onclick="captureAdminFaceSnap()" class="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-cyan-300 text-xs font-bold rounded-xl border border-cyan-500/30 transition">
+                        <i class="fa-solid fa-camera ml-1"></i> الالتقاط من الكاميرا
+                    </button>
+                </div>
+
+                <div>
+                    <label class="block text-xs font-semibold text-slate-300 mb-1">الاسم الكامل للموظف</label>
+                    <input type="text" id="emp-form-name" required class="w-full bg-slate-950 border border-slate-700 text-slate-200 text-xs rounded-xl p-2.5 focus:ring-2 focus:ring-cyan-400 outline-none">
+                </div>
+
+                <div class="grid grid-cols-2 gap-3">
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-300 mb-1">الرقم الوظيفي</label>
+                        <input type="text" id="emp-form-code" required class="w-full bg-slate-950 border border-slate-700 text-slate-200 text-xs rounded-xl p-2.5 focus:ring-2 focus:ring-cyan-400 outline-none">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-300 mb-1">التشكيل / القسم</label>
+                        <input type="text" id="emp-form-dept" required placeholder="مثال: قسم الموارد البشرية" class="w-full bg-slate-950 border border-slate-700 text-slate-200 text-xs rounded-xl p-2.5 focus:ring-2 focus:ring-cyan-400 outline-none">
+                    </div>
+                </div>
+
+                <div class="border-t border-slate-800 pt-3 space-y-3">
+                    <div class="flex items-center justify-between">
+                        <label class="block text-xs font-bold text-cyan-400">موقع عمل الموظف (إحداثيات GPS)</label>
+                        <button type="button" onclick="setAdminCurrentLocationAsWorkplace()" class="text-[11px] text-emerald-400 font-semibold bg-emerald-950/60 px-2.5 py-1 rounded-lg border border-emerald-800 hover:bg-emerald-900">
+                            <i class="fa-solid fa-crosshairs ml-1"></i> تعيين موقعي الحالي
+                        </button>
+                    </div>
+
+                    <div class="grid grid-cols-2 gap-3">
+                        <div>
+                            <label class="block text-[11px] text-slate-400 mb-1">خط العرض (Latitude)</label>
+                            <input type="number" step="any" id="emp-form-lat" required class="w-full bg-slate-950 border border-slate-700 text-slate-200 text-xs rounded-xl p-2 font-mono">
+                        </div>
+                        <div>
+                            <label class="block text-[11px] text-slate-400 mb-1">خط الطول (Longitude)</label>
+                            <input type="number" step="any" id="emp-form-lng" required class="w-full bg-slate-950 border border-slate-700 text-slate-200 text-xs rounded-xl p-2 font-mono">
+                        </div>
+                    </div>
+
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-300 mb-1">نطاق البصمة المسموح (بالأمتار)</label>
+                        <input type="number" id="emp-form-radius" min="10" max="5000" value="100" required class="w-full bg-slate-950 border border-slate-700 text-slate-200 text-xs rounded-xl p-2.5 focus:ring-2 focus:ring-cyan-400 outline-none">
+                    </div>
+                </div>
+
+                <div class="pt-4 flex items-center justify-end space-x-2 space-x-reverse border-t border-slate-800">
+                    <button type="button" onclick="closeEmployeeModal()" class="px-4 py-2 text-xs font-semibold text-slate-400 hover:text-white">إلغاء</button>
+                    <button type="submit" class="px-5 py-2 text-xs font-bold text-slate-950 bg-gradient-to-r from-cyan-400 to-blue-500 rounded-xl shadow-neon-cyan">حفظ البيانات والبصمة</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Toast Notifications Floating Container -->
+    <div id="toast-container" class="fixed bottom-5 left-5 z-50 space-y-2 pointer-events-none no-print"></div>
+
+    <!-- Application Script -->
+    <script>
+        // --- MOCK DATABASE ---
+        let employees = [
+            { 
+                id: "EMP-101", 
+                name: "مصطفى علي أحمد", 
+                dept: "قسم تكنولوجيا المعلومات", 
+                lat: 33.3152, 
+                lng: 44.3661, 
+                radius: 150,
+                photo: "https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=200&q=80"
+            },
+            { 
+                id: "EMP-102", 
+                name: "زينب عبد المحسن", 
+                dept: "قسم الموارد البشرية", 
+                lat: 33.3152, 
+                lng: 44.3661, 
+                radius: 100,
+                photo: "https://images.unsplash.com/photo-1517841905240-472988babdf9?auto=format&fit=crop&w=200&q=80"
+            },
+            { 
+                id: "EMP-103", 
+                name: "كرار حسين الفتلاوي", 
+                dept: "الدائرة المالية", 
+                lat: 33.3152, 
+                lng: 44.3661, 
+                radius: 120,
+                photo: "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&w=200&q=80"
+            }
+        ];
+
+        let logs = [
+            { id: 1, empId: "EMP-101", date: getTodayString(), timeIn: "08:12:10 ص", timeOut: "--", distance: 32, livenessVerified: true, status: "PRESENT", notes: "تم اجتياز اختبار الحيوية (الابتسام)" },
+            { id: 2, empId: "EMP-102", date: getTodayString(), timeIn: "08:44:05 ص", timeOut: "--", distance: 15, livenessVerified: true, status: "LATE", notes: "تم اجتياز اختبار الحيوية (الرمش)" }
+        ];
+
+        let currentEmpId = "EMP-101";
+        let userCurrentLocation = { lat: 33.3152, lng: 44.3661 }; // Default mock
+        let mediaStream = null;
+        let isCameraActive = false;
+        let animationFrameId = null;
+
+        // Liveness State Machine
+        const LIVENESS_TASKS = [
+            { id: 'SMILE', text: 'يرجى الابتسام لإنهاء التحقق الحي 🙂', icon: 'fa-face-smile' },
+            { id: 'BLINK', text: 'يرجى الرمش بعينيك الآن 👁️', icon: 'fa-eye' },
+            { id: 'TILT', text: 'يرجى إمالة الرأس قليلاً 👤', icon: 'fa-user-astronaut' }
+        ];
+        let currentLivenessTask = null;
+        let isLivenessPassed = false;
+        let faceMeshPoints = [];
+
+        // --- INIT ON LOAD ---
+        window.onload = function() {
+            startClock();
+            initDateFilter();
+            renderEmpSelectMock();
+            fetchGPSLocation();
+            switchRole('employee');
+        };
+
+        function startClock() {
+            const timeEl = document.getElementById('live-time');
+            const dateEl = document.getElementById('live-date');
+            
+            setInterval(() => {
+                const now = new Date();
+                timeEl.textContent = now.toLocaleTimeString('ar-IQ');
+                dateEl.textContent = now.toLocaleDateString('ar-IQ', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
+            }, 1000);
+        }
+
+        function getTodayString() {
+            return new Date().toISOString().split('T')[0];
+        }
+
+        function initDateFilter() {
+            document.getElementById('report-filter-date').value = getTodayString();
+        }
+
+        // --- HAVERSINE GPS DISTANCE ---
+        function calculateDistanceMeters(lat1, lon1, lat2, lon2) {
+            const R = 6371e3;
+            const φ1 = lat1 * Math.PI/180;
+            const φ2 = lat2 * Math.PI/180;
+            const Δφ = (lat2-lat1) * Math.PI/180;
+            const Δλ = (lon2-lon1) * Math.PI/180;
+
+            const a = Math.sin(Δφ/2) * Math.sin(Δφ/2) +
+                      Math.cos(φ1) * Math.cos(φ2) *
+                      Math.sin(Δλ/2) * Math.sin(Δλ/2);
+            const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+
+            return Math.round(R * c);
+        }
+
+        function fetchGPSLocation() {
+            const headerStatus = document.getElementById('gps-header-status');
+            headerStatus.textContent = "GPS: جاري الالتقاط...";
+
+            if ("geolocation" in navigator) {
+                navigator.geolocation.getCurrentPosition(
+                    (pos) => {
+                        userCurrentLocation = { lat: pos.coords.latitude, lng: pos.coords.longitude };
+                        headerStatus.textContent = `GPS: (${userCurrentLocation.lat.toFixed(3)}, ${userCurrentLocation.lng.toFixed(3)})`;
+                        updateEmployeeGPSUI();
+                    },
+                    (err) => {
+                        headerStatus.textContent = "GPS: موقع افتراضي مفعّل";
+                        updateEmployeeGPSUI();
+                    },
+                    { enableHighAccuracy: true, timeout: 5000 }
+                );
+            } else {
+                headerStatus.textContent = "GPS غير مدعوم";
+                updateEmployeeGPSUI();
+            }
+        }
+
+        function updateEmployeeGPSUI() {
+            const emp = employees.find(e => e.id === currentEmpId);
+            if (!emp) return;
+
+            const dist = calculateDistanceMeters(userCurrentLocation.lat, userCurrentLocation.lng, emp.lat, emp.lng);
+            document.getElementById('emp-current-distance').textContent = `${dist} متر`;
+            document.getElementById('emp-allowed-radius').textContent = `${emp.radius} متر`;
+
+            const progressBar = document.getElementById('radar-progress-bar');
+            const statusPill = document.getElementById('geofence-status-pill');
+
+            const percent = Math.min(100, Math.max(0, 100 - (dist / emp.radius * 100)));
+            progressBar.style.width = `${percent}%`;
+
+            if (dist <= emp.radius) {
+                statusPill.className = "px-2 py-0.5 rounded bg-emerald-950 text-emerald-300 border border-emerald-800 text-[11px]";
+                statusPill.textContent = "داخل النطاق المسموح";
+            } else {
+                statusPill.className = "px-2 py-0.5 rounded bg-rose-950 text-rose-300 border border-rose-800 text-[11px]";
+                statusPill.textContent = `خارج النطاق (${dist}m)`;
+            }
+        }
+
+        // --- WEBCAM & LIVENESS SIMULATION ENGINE ---
+        async function startCamera() {
+            try {
+                mediaStream = await navigator.mediaDevices.getUserMedia({ video: { width: 640, height: 480 } });
+                const video = document.getElementById('webcam-video');
+                video.srcObject = mediaStream;
+                
+                document.getElementById('camera-placeholder').classList.add('hidden');
+                document.getElementById('scan-overlay').classList.remove('hidden');
+                isCameraActive = true;
+
+                // Pick Random Liveness Task
+                pickRandomLivenessTask();
+
+                // Start canvas mesh loop
+                drawFaceMeshLoop();
+                showToast("تم تشغيل حساس الوجه الكاميرا بنجاح", "info");
+
+            } catch (err) {
+                showToast("تعذر الوصول للكاميرا! الرجاء إعطاء الصلاحية في المتصفح.", "error");
+            }
+        }
+
+        function stopCamera() {
+            if (mediaStream) {
+                mediaStream.getTracks().forEach(track => track.stop());
+            }
+            if (animationFrameId) {
+                cancelAnimationFrame(animationFrameId);
+            }
+            isCameraActive = false;
+            document.getElementById('camera-placeholder').classList.remove('hidden');
+            document.getElementById('scan-overlay').classList.add('hidden');
+            resetLivenessState();
+        }
+
+        function pickRandomLivenessTask() {
+            const task = LIVENESS_TASKS[Math.floor(Math.random() * LIVENESS_TASKS.length)];
+            currentLivenessTask = task;
+            isLivenessPassed = false;
+
+            const instText = document.getElementById('liveness-instruction-text');
+            instText.innerHTML = `<i class="fa-solid ${task.icon} animate-bounce"></i> <span>${task.text}</span>`;
+
+            const badge = document.getElementById('liveness-badge');
+            badge.className = "px-3 py-1 rounded-full text-xs font-bold bg-amber-950 text-amber-400 border border-amber-500/30 flex items-center";
+            badge.innerHTML = `<i class="fa-solid fa-spinner fa-spin ml-1.5"></i> فحص الحيوية جارٍ...`;
+
+            disablePunchButtons();
+
+            // Simulate automatic face action verification after 2.5 seconds of user response
+            setTimeout(() => {
+                if (isCameraActive) {
+                    passLivenessCheck();
+                }
+            }, 2500);
+        }
+
+        function passLivenessCheck() {
+            isLivenessPassed = true;
+            const badge = document.getElementById('liveness-badge');
+            badge.className = "px-3 py-1 rounded-full text-xs font-bold bg-emerald-950 text-emerald-300 border border-emerald-500/30 flex items-center";
+            badge.innerHTML = `<i class="fa-solid fa-circle-check ml-1.5"></i> تم اجتياز الحيوية والتعرف على الوجه`;
+
+            const instText = document.getElementById('liveness-instruction-text');
+            instText.innerHTML = `<i class="fa-solid fa-check-double text-emerald-400"></i> <span class="text-emerald-300">تم التحقق من الوجه الحي بنجاح! يمكنك البصمة الآن.</span>`;
+
+            enablePunchButtons();
+            showToast("تم إجراء فحص الحيوية بنجاح واكتشاف الوجه الحي!", "success");
+        }
+
+        function resetLivenessState() {
+            isLivenessPassed = false;
+            disablePunchButtons();
+            const badge = document.getElementById('liveness-badge');
+            badge.className = "px-3 py-1 rounded-full text-xs font-bold bg-slate-900 text-amber-400 border border-amber-500/30 flex items-center";
+            badge.innerHTML = `<i class="fa-solid fa-triangle-exclamation ml-1.5"></i> بانتظار بدء الفحص`;
+        }
+
+        // Draw animated facial landmark mesh on canvas
+        function drawFaceMeshLoop() {
+            const canvas = document.getElementById('face-canvas');
+            const video = document.getElementById('webcam-video');
+            if (!canvas || !video) return;
+
+            const ctx = canvas.getContext('2d');
+            canvas.width = video.clientWidth || 400;
+            canvas.height = video.clientHeight || 300;
+
+            function animate() {
+                if (!isCameraActive) return;
+                ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+                const time = Date.now() * 0.003;
+                const centerX = canvas.width / 2 + Math.sin(time) * 10;
+                const centerY = canvas.height / 2 + Math.cos(time * 0.8) * 8;
+                const radiusX = 85;
+                const radiusY = 110;
+
+                // Draw Polygon/Bounding Oval around Face
+                ctx.beginPath();
+                ctx.ellipse(centerX, centerY, radiusX, radiusY, 0, 0, 2 * Math.PI);
+                ctx.strokeStyle = isLivenessPassed ? 'rgba(16, 185, 129, 0.8)' : 'rgba(0, 240, 255, 0.7)';
+                ctx.lineWidth = 2;
+                ctx.setLineDash([6, 4]);
+                ctx.stroke();
+
+                // Draw Facial Keypoint Mesh Dots
+                const points = [
+                    { x: centerX - 30, y: centerY - 25 }, // Left eye
+                    { x: centerX + 30, y: centerY - 25 }, // Right eye
+                    { x: centerX, y: centerY + 5 },       // Nose tip
+                    { x: centerX - 25, y: centerY + 40 }, // Mouth left
+                    { x: centerX + 25, y: centerY + 40 }, // Mouth right
+                    { x: centerX, y: centerY + (isLivenessPassed ? 48 : 42) }, // Chin
+                ];
+
+                ctx.fillStyle = isLivenessPassed ? '#10b981' : '#00f0ff';
+                points.forEach(pt => {
+                    ctx.beginPath();
+                    ctx.arc(pt.x, pt.y, 3.5, 0, 2 * Math.PI);
+                    ctx.fill();
+                });
+
+                // Connect Mesh Lines
+                ctx.beginPath();
+                ctx.moveTo(points[0].x, points[0].y);
+                ctx.lineTo(points[1].x, points[1].y);
+                ctx.lineTo(points[2].x, points[2].y);
+                ctx.closePath();
+                ctx.strokeStyle = 'rgba(0, 240, 255, 0.25)';
+                ctx.lineWidth = 1;
+                ctx.setLineDash([]);
+                ctx.stroke();
+
+                animationFrameId = requestAnimationFrame(animate);
+            }
+
+            animate();
+        }
+
+        function enablePunchButtons() {
+            const btnIn = document.getElementById('btn-punch-in');
+            const btnOut = document.getElementById('btn-punch-out');
+
+            btnIn.disabled = false;
+            btnIn.className = "py-4 px-4 bg-gradient-to-r from-emerald-500 to-teal-600 text-slate-950 font-black rounded-2xl shadow-lg hover:brightness-110 active:scale-95 transition flex items-center justify-center space-x-2 space-x-reverse cursor-pointer";
+
+            btnOut.disabled = false;
+            btnOut.className = "py-4 px-4 bg-gradient-to-r from-rose-500 to-red-600 text-white font-black rounded-2xl shadow-lg hover:brightness-110 active:scale-95 transition flex items-center justify-center space-x-2 space-x-reverse cursor-pointer";
+        }
+
+        function disablePunchButtons() {
+            const btnIn = document.getElementById('btn-punch-in');
+            const btnOut = document.getElementById('btn-punch-out');
+
+            btnIn.disabled = true;
+            btnIn.className = "py-4 px-4 bg-slate-800 text-slate-500 font-extrabold rounded-2xl shadow-lg cursor-not-allowed flex items-center justify-center space-x-2 space-x-reverse";
+
+            btnOut.disabled = true;
+            btnOut.className = "py-4 px-4 bg-slate-800 text-slate-500 font-extrabold rounded-2xl shadow-lg cursor-not-allowed flex items-center justify-center space-x-2 space-x-reverse";
+        }
+
+        // --- BIOMETRIC PUNCH ACTION ---
+        function triggerBiometricPunch(type) {
+            if (!isLivenessPassed) {
+                showToast("يرجى إكمال اختبار الحيوية للوجه أولاً!", "error");
+                return;
+            }
+
+            const emp = employees.find(e => e.id === currentEmpId);
+            const dist = calculateDistanceMeters(userCurrentLocation.lat, userCurrentLocation.lng, emp.lat, emp.lng);
+
+            if (dist > emp.radius) {
+                showToast(`عذراً، أنت خارج النطاق الجغرافي المسموح! المسافة: ${dist}m (المسموح: ${emp.radius}m)`, "error");
+                return;
+            }
+
+            const currentTimeStr = new Date().toLocaleTimeString('ar-IQ');
+            const todayStr = getTodayString();
+            const existingLog = logs.find(l => l.empId === currentEmpId && l.date === todayStr);
+
+            if (type === 'IN') {
+                if (existingLog) {
+                    showToast("لقد قمت بتسجيل الدخول مسبقاً لهذا اليوم!", "warning");
+                    return;
+                }
+
+                const now = new Date();
+                const isLate = (now.getHours() > 8 || (now.getHours() === 8 && now.getMinutes() > 30));
+
+                logs.unshift({
+                    id: Date.now(),
+                    empId: currentEmpId,
+                    date: todayStr,
+                    timeIn: currentTimeStr,
+                    timeOut: "--",
+                    distance: dist,
+                    livenessVerified: true,
+                    status: isLate ? "LATE" : "PRESENT",
+                    notes: `بصمة وجه حية (${currentLivenessTask ? currentLivenessTask.id : 'OK'})`
+                });
+
+                showToast(`تم تسجيل دخولك بنجاح عبر بصمة الوجه! الوقت: ${currentTimeStr}`, "success");
+            } else {
+                if (!existingLog) {
+                    showToast("لم تسجل بصمة دخول اليوم لتتمكن من الانصراف!", "warning");
+                    return;
+                }
+                if (existingLog.timeOut !== "--") {
+                    showToast("تم تسجيل الانصراف سابقاً!", "warning");
+                    return;
+                }
+                existingLog.timeOut = currentTimeStr;
+                showToast(`تم تسجيل الخروج والانصراف بنجاح! الوقت: ${currentTimeStr}`, "success");
+            }
+
+            renderEmployeeLogs();
+        }
+
+        // --- EMPLOYEE PORTAL UI SWITCHERS ---
+        function renderEmpSelectMock() {
+            const select = document.getElementById('select-emp-mock');
+            select.innerHTML = employees.map(e => `<option value="${e.id}" ${e.id === currentEmpId ? 'selected' : ''}>${e.name} (${e.dept})</option>`).join('');
+        }
+
+        function changeEmployeeUser(empId) {
+            currentEmpId = empId;
+            loadEmployeePortal();
+        }
+
+        function loadEmployeePortal() {
+            const emp = employees.find(e => e.id === currentEmpId) || employees[0];
+            document.getElementById('emp-name-display').textContent = emp.name;
+            document.getElementById('emp-dept-badge').textContent = emp.dept;
+            document.getElementById('emp-code').textContent = `#${emp.id}`;
+            document.getElementById('emp-avatar-img').src = emp.photo;
+
+            updateEmployeeGPSUI();
+            renderEmployeeLogs();
+        }
+
+        function renderEmployeeLogs() {
+            const tbody = document.getElementById('emp-logs-tbody');
+            const empLogs = logs.filter(l => l.empId === currentEmpId);
+
+            if (empLogs.length === 0) {
+                tbody.innerHTML = `<tr><td colspan="5" class="p-4 text-center text-slate-500 text-xs">لا توجد بصمات وجه مسجلة بعد</td></tr>`;
+                return;
+            }
+
+            tbody.innerHTML = empLogs.map(l => {
+                const statusBadge = l.status === 'PRESENT' 
+                    ? `<span class="px-2 py-0.5 rounded text-[10px] bg-emerald-950 text-emerald-300 border border-emerald-800 font-bold">حاضر</span>`
+                    : `<span class="px-2 py-0.5 rounded text-[10px] bg-amber-950 text-amber-300 border border-amber-800 font-bold">متأخر</span>`;
+
+                return `
+                    <tr class="hover:bg-slate-900/50 transition">
+                        <td class="p-2.5 font-medium text-slate-300">${l.date}</td>
+                        <td class="p-2.5 font-mono font-bold text-cyan-300">${l.timeIn}</td>
+                        <td class="p-2.5 font-mono text-slate-400">${l.timeOut}</td>
+                        <td class="p-2.5"><i class="fa-solid fa-face-smile text-emerald-400"></i> موثوق</td>
+                        <td class="p-2.5">${statusBadge}</td>
+                    </tr>
+                `;
+            }).join('');
+        }
+
+        // --- ROLE SWITCHING ---
+        function switchRole(role) {
+            const btnEmp = document.getElementById('btn-role-emp');
+            const btnAdmin = document.getElementById('btn-role-admin');
+            const viewEmp = document.getElementById('view-employee');
+            const viewAdmin = document.getElementById('view-admin');
+
+            if (role === 'employee') {
+                btnEmp.className = "px-4 py-2 rounded-xl transition-all duration-300 bg-cyan-500 text-slate-950 font-bold shadow-neon-cyan";
+                btnAdmin.className = "px-4 py-2 rounded-xl transition-all duration-300 text-slate-400 hover:text-white";
+                viewEmp.classList.remove('hidden');
+                viewAdmin.classList.add('hidden');
+                loadEmployeePortal();
+            } else {
+                btnAdmin.className = "px-4 py-2 rounded-xl transition-all duration-300 bg-cyan-500 text-slate-950 font-bold shadow-neon-cyan";
+                btnEmp.className = "px-4 py-2 rounded-xl transition-all duration-300 text-slate-400 hover:text-white";
+                viewAdmin.classList.remove('hidden');
+                viewEmp.classList.add('hidden');
+                stopCamera();
+                loadAdminDashboard();
+            }
+        }
+
+        // --- ADMIN DASHBOARD TAB SWITCHING ---
+        function switchAdminTab(tab) {
+            ['overview', 'employees', 'reports'].forEach(t => {
+                document.getElementById(`admin-tab-${t}`).classList.add('hidden');
+                document.getElementById(`tab-btn-${t}`).className = "px-5 py-2.5 rounded-xl font-bold text-xs text-slate-300 hover:bg-slate-800/60 transition";
+            });
+
+            document.getElementById(`admin-tab-${tab}`).classList.remove('hidden');
+            document.getElementById(`tab-btn-${tab}`).className = "px-5 py-2.5 rounded-xl font-bold text-xs bg-cyan-500 text-slate-950 shadow-neon-cyan transition";
+
+            if (tab === 'overview') renderAdminStats();
+            if (tab === 'employees') renderAdminEmployees();
+            if (tab === 'reports') { populateDeptFilters(); generateReport(); }
+        }
+
+        function renderAdminStats() {
+            const todayStr = getTodayString();
+            const todayLogs = logs.filter(l => l.date === todayStr);
+
+            const total = employees.length;
+            const present = todayLogs.filter(l => l.status === 'PRESENT').length;
+            const late = todayLogs.filter(l => l.status === 'LATE').length;
+            const absent = Math.max(0, total - (present + late));
+
+            document.getElementById('stat-total-emp').textContent = total;
+            document.getElementById('stat-present-emp').textContent = present;
+            document.getElementById('stat-late-emp').textContent = late;
+            document.getElementById('stat-absent-emp').textContent = absent;
+
+            const liveTbody = document.getElementById('admin-live-logs');
+            if (todayLogs.length === 0) {
+                liveTbody.innerHTML = `<tr><td colspan="7" class="p-4 text-center text-slate-500 text-xs">لا توجد حركات بصمة وجه مسجلة اليوم حتى الآن</td></tr>`;
+                return;
+            }
+
+            liveTbody.innerHTML = todayLogs.map(l => {
+                const emp = employees.find(e => e.id === l.empId);
+                return `
+                    <tr class="hover:bg-slate-900/50 transition">
+                        <td class="p-3 font-bold text-slate-200">${emp ? emp.name : l.empId}</td>
+                        <td class="p-3 text-slate-400">${emp ? emp.dept : '-'}</td>
+                        <td class="p-3"><span class="px-2 py-0.5 rounded text-[10px] ${l.timeOut === '--' ? 'bg-cyan-950 text-cyan-300 border border-cyan-800' : 'bg-purple-950 text-purple-300 border border-purple-800'}">${l.timeOut === '--' ? 'دخول' : 'خروج'}</span></td>
+                        <td class="p-3 font-mono font-bold text-cyan-300">${l.timeIn}</td>
+                        <td class="p-3 text-emerald-400 font-semibold"><i class="fa-solid fa-circle-check ml-1"></i> مكتمل</td>
+                        <td class="p-3 font-mono text-slate-400">${l.distance}m</td>
+                        <td class="p-3">${l.status === 'PRESENT' ? '<span class="text-xs text-emerald-400 font-bold">في الوقت</span>' : '<span class="text-xs text-amber-400 font-bold">متأخر</span>'}</td>
+                    </tr>
+                `;
+            }).join('');
+        }
+
+        function renderAdminEmployees() {
+            const tbody = document.getElementById('admin-emp-table');
+            tbody.innerHTML = employees.map(e => `
+                <tr class="hover:bg-slate-900/50 transition">
+                    <td class="p-3.5">
+                        <img src="${e.photo}" class="w-10 h-10 rounded-xl object-cover border border-cyan-500/40">
+                    </td>
+                    <td class="p-3.5 font-bold text-slate-200">${e.name}</td>
+                    <td class="p-3.5 font-mono text-xs text-slate-400">#${e.id}</td>
+                    <td class="p-3.5 text-slate-300">${e.dept}</td>
+                    <td class="p-3.5 font-mono text-xs text-slate-400">${e.lat.toFixed(4)}, ${e.lng.toFixed(4)}</td>
+                    <td class="p-3.5 font-bold text-cyan-400">${e.radius} متر</td>
+                    <td class="p-3.5 text-center space-x-2 space-x-reverse">
+                        <button onclick="editEmployee('${e.id}')" class="text-cyan-400 hover:text-cyan-200 p-1"><i class="fa-solid fa-pen-to-square"></i></button>
+                        <button onclick="deleteEmployee('${e.id}')" class="text-rose-400 hover:text-rose-200 p-1"><i class="fa-solid fa-trash"></i></button>
+                    </td>
+                </tr>
+            `).join('');
+        }
+
+        // --- EMPLOYEE MODAL & SNAPSHOT ---
+        function openEmployeeModal() {
+            document.getElementById('form-employee').reset();
+            document.getElementById('emp-form-id').value = '';
+            document.getElementById('emp-form-snap-preview').src = "https://placehold.co/150x150/1e293b/00f0ff?text=Snap";
+            document.getElementById('modal-emp-title').textContent = "تسجيل موظف وبصمة وجه جديدة";
+            document.getElementById('emp-form-lat').value = userCurrentLocation.lat;
+            document.getElementById('emp-form-lng').value = userCurrentLocation.lng;
+            document.getElementById('modal-employee').classList.remove('hidden');
+        }
+
+        function closeEmployeeModal() {
+            document.getElementById('modal-employee').classList.add('hidden');
+        }
+
+        function captureAdminFaceSnap() {
+            if (!isCameraActive) {
+                showToast("الرجاء تشغيل كاميرا الموظف أولاً لالتقاط البصمة المرجعية!", "warning");
+                return;
+            }
+            const video = document.getElementById('webcam-video');
+            const canvas = document.createElement('canvas');
+            canvas.width = 200;
+            canvas.height = 200;
+            const ctx = canvas.getContext('2d');
+            ctx.drawImage(video, 0, 0, 200, 200);
+
+            const dataUrl = canvas.toDataURL('image/jpeg');
+            document.getElementById('emp-form-snap-preview').src = dataUrl;
+            document.getElementById('emp-form-face-data').value = dataUrl;
+            showToast("تم التقاط البصمة المرجعية للوجه بنجاح!", "success");
+        }
+
+        function setAdminCurrentLocationAsWorkplace() {
+            document.getElementById('emp-form-lat').value = userCurrentLocation.lat;
+            document.getElementById('emp-form-lng').value = userCurrentLocation.lng;
+            showToast("تم نسخ إحداثيات موقعك الحالي", "success");
+        }
+
+        function saveEmployee(e) {
+            e.preventDefault();
+            const id = document.getElementById('emp-form-id').value;
+            const name = document.getElementById('emp-form-name').value;
+            const code = document.getElementById('emp-form-code').value;
+            const dept = document.getElementById('emp-form-dept').value;
+            const lat = parseFloat(document.getElementById('emp-form-lat').value);
+            const lng = parseFloat(document.getElementById('emp-form-lng').value);
+            const radius = parseInt(document.getElementById('emp-form-radius').value);
+            const snap = document.getElementById('emp-form-snap-preview').src;
+
+            if (id) {
+                const emp = employees.find(x => x.id === id);
+                if (emp) {
+                    emp.name = name;
+                    emp.dept = dept;
+                    emp.lat = lat;
+                    emp.lng = lng;
+                    emp.radius = radius;
+                    if (snap) emp.photo = snap;
+                }
+                showToast("تم تحديث بيانات الموظف والبصمة بنجاح", "success");
+            } else {
+                employees.push({ id: code, name, dept, lat, lng, radius, photo: snap });
+                showToast("تم إضافة الموظف وبصمة وجهه بنجاح", "success");
+            }
+
+            closeEmployeeModal();
+            renderAdminEmployees();
+            renderEmpSelectMock();
+        }
+
+        function editEmployee(id) {
+            const emp = employees.find(e => e.id === id);
+            if (!emp) return;
+
+            document.getElementById('emp-form-id').value = emp.id;
+            document.getElementById('emp-form-name').value = emp.name;
+            document.getElementById('emp-form-code').value = emp.id;
+            document.getElementById('emp-form-dept').value = emp.dept;
+            document.getElementById('emp-form-lat').value = emp.lat;
+            document.getElementById('emp-form-lng').value = emp.lng;
+            document.getElementById('emp-form-radius').value = emp.radius;
+            document.getElementById('emp-form-snap-preview').src = emp.photo;
+
+            document.getElementById('modal-emp-title').textContent = "تعديل بيانات وبصمة الموظف";
+            document.getElementById('modal-employee').classList.remove('hidden');
+        }
+
+        function deleteEmployee(id) {
+            if (confirm("هل أنت متأكد من حذف الموظف وبصمته المرجعية؟")) {
+                employees = employees.filter(e => e.id !== id);
+                renderAdminEmployees();
+                renderEmpSelectMock();
+                showToast("تم حذف الموظف من النظام", "info");
+            }
+        }
+
+        // --- REPORTS GENERATOR ---
+        function populateDeptFilters() {
+            const select = document.getElementById('report-filter-dept');
+            const depts = [...new Set(employees.map(e => e.dept))];
+            select.innerHTML = '<option value="ALL">جميع التشكيلات والأقسام</option>' + 
+                depts.map(d => `<option value="${d}">${d}</option>`).join('');
+        }
+
+        function generateReport() {
+            const deptFilter = document.getElementById('report-filter-dept').value;
+            const statusFilter = document.getElementById('report-filter-status').value;
+            const dateFilter = document.getElementById('report-filter-date').value;
+
+            document.getElementById('print-report-date-title').textContent = `التاريخ: ${dateFilter}`;
+
+            const tbody = document.getElementById('report-tbody');
+            let results = [];
+
+            employees.forEach(emp => {
+                if (deptFilter !== 'ALL' && emp.dept !== deptFilter) return;
+
+                const empLog = logs.find(l => l.empId === emp.id && l.date === dateFilter);
+                let status = empLog ? empLog.status : "ABSENT";
+
+                if (statusFilter !== 'ALL' && statusFilter !== status) return;
+
+                results.push({ emp, log: empLog, status });
+            });
+
+            document.getElementById('report-count-summary').textContent = `عدد السجلات المعروضة: ${results.length}`;
+
+            if (results.length === 0) {
+                tbody.innerHTML = `<tr><td colspan="7" class="p-6 text-center text-slate-500 font-semibold">لا توجد سجلات تطابق الفلتر المحدد</td></tr>`;
+                return;
+            }
+
+            tbody.innerHTML = results.map(r => {
+                let statusBadge = r.status === 'PRESENT' 
+                    ? `<span class="px-2.5 py-1 rounded text-xs bg-emerald-950 text-emerald-300 border border-emerald-800 font-bold">حاضر في الوقت</span>`
+                    : r.status === 'LATE'
+                    ? `<span class="px-2.5 py-1 rounded text-xs bg-amber-950 text-amber-300 border border-amber-800 font-bold">متأخر</span>`
+                    : `<span class="px-2.5 py-1 rounded text-xs bg-rose-950 text-rose-300 border border-rose-800 font-bold">متغيب</span>`;
+
+                return `
+                    <tr class="hover:bg-slate-900/50 transition">
+                        <td class="p-3.5 font-bold text-slate-200">${r.emp.name}</td>
+                        <td class="p-3.5 font-mono text-xs text-slate-400">#${r.emp.id}</td>
+                        <td class="p-3.5 text-slate-300">${r.emp.dept}</td>
+                        <td class="p-3.5 font-mono font-bold text-cyan-300">${r.log ? r.log.timeIn : '--'}</td>
+                        <td class="p-3.5 font-mono text-slate-400">${r.log ? r.log.timeOut : '--'}</td>
+                        <td class="p-3.5 text-xs text-slate-400">${r.log ? '<i class="fa-solid fa-face-smile text-emerald-400 ml-1"></i> تم اجتياز الاختبار' : 'لم تبصم'}</td>
+                        <td class="p-3.5">${statusBadge}</td>
+                    </tr>
+                `;
+            }).join('');
+        }
+
+        function exportCSV() {
+            const dateFilter = document.getElementById('report-filter-date').value;
+            let csv = '\uFEFFاسم الموظف,الرقم الوظيفي,التشكيل/القسم,وقت الدخول,وقت الخروج,الحالة\n';
+
+            const deptFilter = document.getElementById('report-filter-dept').value;
+            const statusFilter = document.getElementById('report-filter-status').value;
+
+            employees.forEach(emp => {
+                if (deptFilter !== 'ALL' && emp.dept !== deptFilter) return;
+                const empLog = logs.find(l => l.empId === emp.id && l.date === dateFilter);
+                let status = empLog ? empLog.status : "ABSENT";
+                if (statusFilter !== 'ALL' && statusFilter !== status) return;
+
+                const statusText = status === 'PRESENT' ? 'حاضر' : status === 'LATE' ? 'متأخر' : 'غائب';
+                csv += `"${emp.name}","${emp.id}","${emp.dept}","${empLog ? empLog.timeIn : '--'}","${empLog ? empLog.timeOut : '--'}","${statusText}"\n`;
+            });
+
+            const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+            const link = document.createElement("a");
+            link.href = URL.createObjectURL(blob);
+            link.setAttribute("download", `تقرير_بصمة_الوجه_${dateFilter}.csv`);
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+        }
+
+        // --- TOAST SYSTEM ---
+        function showToast(message, type = 'info') {
+            const container = document.getElementById('toast-container');
+            const toast = document.createElement('div');
+
+            const bgColors = {
+                success: 'bg-emerald-950 border border-emerald-500/50 text-emerald-200',
+                error: 'bg-rose-950 border border-rose-500/50 text-rose-200',
+                warning: 'bg-amber-950 border border-amber-500/50 text-amber-200',
+                info: 'bg-slate-900 border border-cyan-500/50 text-cyan-200'
+            };
+
+            const icons = {
+                success: 'fa-circle-check text-emerald-400',
+                error: 'fa-triangle-exclamation text-rose-400',
+                warning: 'fa-circle-exclamation text-amber-400',
+                info: 'fa-face-viewfinder text-cyan-400'
+            };
+
+            toast.className = `pointer-events-auto px-4 py-3 rounded-2xl shadow-neon-cyan font-bold text-xs flex items-center space-x-2 space-x-reverse transition duration-300 transform translate-y-2 opacity-0 ${bgColors[type]}`;
+            toast.innerHTML = `<i class="fa-solid ${icons[type]} text-base"></i> <span>${message}</span>`;
+
+            container.appendChild(toast);
+
+            setTimeout(() => {
+                toast.classList.remove('translate-y-2', 'opacity-0');
+            }, 10);
+
+            setTimeout(() => {
+                toast.classList.add('opacity-0');
+                setTimeout(() => toast.remove(), 300);
+            }, 4000);
+        }
+    </script>
+</body>
+</html>
